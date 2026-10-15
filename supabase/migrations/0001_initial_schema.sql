@@ -158,10 +158,12 @@ create table if not exists trainer_member_assignments (
 do $$ begin
   alter table members add constraint fk_members_trainer foreign key (trainer_id) references trainers(id) on delete set null;
 exception when duplicate_table then null;
+  when duplicate_object then null;
 end $$;
 do $$ begin
   alter table profiles add constraint fk_profiles_member foreign key (member_id) references members(id) on delete set null;
 exception when duplicate_table then null;
+  when duplicate_object then null;
 end $$;
 
 create table if not exists workout_plans (
