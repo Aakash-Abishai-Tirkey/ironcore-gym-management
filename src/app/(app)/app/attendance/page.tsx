@@ -16,7 +16,7 @@ export default async function AttendancePage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Attendance</h1>
-      <CheckInForm onDone={() => {}} />
+      <CheckInForm />
       <div className="rounded border bg-white">
         <Table>
           <TableHeader>

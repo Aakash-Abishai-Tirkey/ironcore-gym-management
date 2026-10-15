@@ -5,7 +5,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export function CheckInForm({ onDone }: { onDone: () => void }) {
+export function CheckInForm() {
   const [query, setQuery] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
 
