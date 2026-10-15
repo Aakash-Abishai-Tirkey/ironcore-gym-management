@@ -199,7 +199,7 @@ cross join lateral (
 ) m
 where (m.n % 3) = (d % 3);
 
--- Today's check-ins (one deliberately left open to test duplicate-check-in protection)
+-- Todays check-ins (one deliberately left open to test duplicate-check-in protection)
 insert into attendance_records (member_id, check_in_at, check_out_at, recorded_by)
 select '10000000-0000-4000-8000-000000000001', now() - interval '75 minutes', null, '00000000-0000-4000-8000-000000000003'
 where not exists (
@@ -278,7 +278,7 @@ values
 on conflict (id) do nothing;
 
 insert into workout_exercises (plan_id, order_index, name, category, sets, reps, weight, rest_seconds, notes)
-values
+select v.* from (values
   ('70000000-0000-4000-8000-000000000001',1,'Barbell Back Squat','strength',4,'6',70.00,150,'Top set with spotter'),
   ('70000000-0000-4000-8000-000000000001',2,'Romanian Deadlift','strength',3,'8',60.00,120,null),
   ('70000000-0000-4000-8000-000000000001',3,'Walking Lunge','strength',3,'12 per leg',20.00,90,null),
@@ -300,7 +300,11 @@ values
   ('70000000-0000-4000-8000-000000000005',1,'Competition Squat','strength',5,'3 @ RPE 8',110.00,180,'Weekly load increase'),
   ('70000000-0000-4000-8000-000000000005',2,'Paused Bench Press','strength',5,'3 @ RPE 8',70.00,180,null),
   ('70000000-0000-4000-8000-000000000005',3,'Sumo Deadlift','strength',4,'5',140.00,180,null)
-where not exists (select 1 from workout_exercises e where e.plan_id = '70000000-0000-4000-8000-000000000001' and e.order_index = 1);
+) as v(plan_id, order_index, name, category, sets, reps, weight, rest_seconds, notes)
+where not exists (
+  select 1 from workout_exercises e
+  where e.plan_id = v.plan_id and e.order_index = v.order_index
+);
 
 -- -----------------------------------------------------------------------------
 -- 9. Workout sessions + fitness progress
@@ -314,7 +318,7 @@ where not exists (
 );
 
 insert into fitness_progress_entries (member_id, recorded_by, recorded_at, weight, body_fat, measurements, notes)
-values
+select v.* from (values
   ('10000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000004', current_date - 60, 88.50, 26.0, '{"chest_cm":102,"waist_cm":92,"arm_cm":36}','Baseline measurement'),
   ('10000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000004', current_date - 30, 84.20, 23.4, '{"chest_cm":103,"waist_cm":87,"arm_cm":37}','Mid-program check'),
   ('10000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000004', current_date - 7,  81.90, 21.8, '{"chest_cm":104,"waist_cm":83,"arm_cm":38}','Good progress, squat +10kg'),
@@ -326,10 +330,10 @@ values
   ('10000000-0000-4000-8000-000000000007','00000000-0000-4000-8000-000000000004', current_date - 7,  82.30, 15.2, '{"chest_cm":106,"waist_cm":85}',null),
   ('10000000-0000-4000-8000-000000000013','00000000-0000-4000-8000-000000000004', current_date - 6,  74.10, 14.0, '{"waist_cm":80,"arm_cm":35}',null),
   ('10000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000004', current_date - 5,  54.60, 25.5, '{"waist_cm":66,"arm_cm":26}',null)
+) as v(member_id, recorded_by, recorded_at, weight, body_fat, measurements, notes)
 where not exists (
   select 1 from fitness_progress_entries f
-  where f.member_id = '10000000-0000-4000-8000-000000000001'
-    and f.recorded_at = current_date - 7
+  where f.member_id = v.member_id and f.recorded_at = v.recorded_at
 );
 
 -- -----------------------------------------------------------------------------
@@ -389,14 +393,15 @@ values
 on conflict (id) do nothing;
 
 insert into equipment_maintenance_records (equipment_id, performed_at, notes, cost)
-values
+select v.* from (values
   ('90000000-0000-4000-8000-000000000001', current_date - 40, 'Belt tension adjusted and lubrication done', 3500.00),
   ('90000000-0000-4000-8000-000000000003', current_date - 25, 'Chain replaced', 1800.00),
-  ('90000000-0000-4000-8000-000000000006', current_date - 90, 'Safety pins inspected; J-hook replacement ordered', 5200.00),
+  ('90000000-0000-4000-8000-000000000006', current_date - 90, 'Safety pins inspected, J-hook replacement ordered', 5200.00),
   ('90000000-0000-4000-8000-000000000010', current_date - 100,'Rope condition audit — flagged for replacement', 0.00)
+) as v(equipment_id, performed_at, notes, cost)
 where not exists (
   select 1 from equipment_maintenance_records m
-  where m.equipment_id = '90000000-0000-4000-8000-000000000001' and m.performed_at = current_date - 40
+  where m.equipment_id = v.equipment_id and m.performed_at = v.performed_at
 );
 
 -- -----------------------------------------------------------------------------
@@ -437,7 +442,9 @@ from (values
   ('00000000-0000-4000-8000-000000000001'::uuid,'role.assign','profile','00000000-0000-4000-8000-000000000003'::uuid,'{"role":"receptionist"}'::jsonb, now() - interval '20 days')
 ) as v(actor, action, ttype, tid, meta, at)
 where not exists (
-  select 1 from audit_logs a where a.action = v.action and a.target_id is not distinct from v.tid
+  select 1 from audit_logs a
+  where a.action = v.action
+    and coalesce(a.target_id::text, '') = coalesce(v.tid::text, '')
 );
 
 -- -----------------------------------------------------------------------------

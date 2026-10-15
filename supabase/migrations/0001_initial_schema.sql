@@ -446,7 +446,7 @@ create policy "maint_write_admin" on equipment_maintenance_records for all using
 drop policy if exists "notifications_own" on notifications;
 create policy "notifications_own" on notifications for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
--- audit logs (read admin only; insert via service/admin)
+-- audit logs (read admin only, insert via service or admin)
 drop policy if exists "audit_select_admin" on audit_logs;
 create policy "audit_select_admin" on audit_logs for select using (is_admin());
 drop policy if exists "audit_insert_admin" on audit_logs;
