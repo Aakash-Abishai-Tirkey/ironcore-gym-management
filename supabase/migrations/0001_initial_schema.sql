@@ -4,11 +4,26 @@ create extension if not exists "uuid-ossp";
 create sequence if not exists member_code_seq start 1001;
 create sequence if not exists payment_code_seq start 100001;
 
-create type user_role as enum ('owner','admin','receptionist','trainer','member');
-create type membership_status as enum ('active','inactive','expired','frozen','cancelled','archived');
-create type subscription_status as enum ('active','expired','frozen','cancelled');
-create type payment_status as enum ('pending','completed','failed','refunded','reversed');
-create type payment_method as enum ('cash','upi','card','bank_transfer','other');
+do $$ begin
+  create type user_role as enum ('owner','admin','receptionist','trainer','member');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type membership_status as enum ('active','inactive','expired','frozen','cancelled','archived');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type subscription_status as enum ('active','expired','frozen','cancelled');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type payment_status as enum ('pending','completed','failed','refunded','reversed');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type payment_method as enum ('cash','upi','card','bank_transfer','other');
+exception when duplicate_object then null;
+end $$;
 
 create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -140,8 +155,14 @@ create table if not exists trainer_member_assignments (
   unique (trainer_id, member_id)
 );
 
-alter table members add constraint fk_members_trainer foreign key (trainer_id) references trainers(id) on delete set null;
-alter table profiles add constraint fk_profiles_member foreign key (member_id) references members(id) on delete set null;
+do $$ begin
+  alter table members add constraint fk_members_trainer foreign key (trainer_id) references trainers(id) on delete set null;
+exception when duplicate_table then null;
+end $$;
+do $$ begin
+  alter table profiles add constraint fk_profiles_member foreign key (member_id) references members(id) on delete set null;
+exception when duplicate_table then null;
+end $$;
 
 create table if not exists workout_plans (
   id uuid primary key default uuid_generate_v4(),
@@ -267,19 +288,19 @@ create index if not exists idx_attendance_member on attendance_records(member_id
 create index if not exists idx_attendance_checkin on attendance_records(check_in_at);
 
 -- Helper functions for RLS
-create or replace function current_role() returns user_role
+create or replace function get_current_app_role() returns user_role
 language sql stable security definer as $$
   select role from profiles where id = auth.uid();
 $$;
 
 create or replace function is_staff() returns boolean
 language sql stable security definer as $$
-  select coalesce(current_role() in ('owner','admin','receptionist','trainer'), false);
+  select coalesce(get_current_app_role() in ('owner','admin','receptionist','trainer'), false);
 $$;
 
 create or replace function is_admin() returns boolean
 language sql stable security definer as $$
-  select coalesce(current_role() in ('owner','admin'), false);
+  select coalesce(get_current_app_role() in ('owner','admin'), false);
 $$;
 
 -- Enable RLS
@@ -304,91 +325,129 @@ alter table notifications enable row level security;
 alter table audit_logs enable row level security;
 
 -- profiles policies
+drop policy if exists "profiles_select_self_or_staff" on profiles;
 create policy "profiles_select_self_or_staff" on profiles for select
   using (id = auth.uid() or is_staff());
+drop policy if exists "profiles_update_self_or_admin" on profiles;
 create policy "profiles_update_self_or_admin" on profiles for update
   using (id = auth.uid() or is_admin());
+drop policy if exists "profiles_insert_admin" on profiles;
 create policy "profiles_insert_admin" on profiles for insert
   with check (is_admin() or id = auth.uid());
 
 -- members policies
+drop policy if exists "members_select_staff_or_self" on members;
 create policy "members_select_staff_or_self" on members for select
   using (is_staff() or exists (select 1 from profiles p where p.id = auth.uid() and p.member_id = members.id));
+drop policy if exists "members_insert_staff" on members;
 create policy "members_insert_staff" on members for insert
   with check (is_staff());
+drop policy if exists "members_update_staff" on members;
 create policy "members_update_staff" on members for update
   using (is_staff());
+drop policy if exists "members_delete_admin" on members;
 create policy "members_delete_admin" on members for delete
   using (is_admin());
 
 -- membership_plans: readable by all authed, writable by admin
+drop policy if exists "plans_select_authed" on membership_plans;
 create policy "plans_select_authed" on membership_plans for select
   using (auth.uid() is not null);
+drop policy if exists "plans_write_admin" on membership_plans;
 create policy "plans_write_admin" on membership_plans for all
   using (is_admin()) with check (is_admin());
 
 -- subscriptions
+drop policy if exists "subs_select_staff_or_self" on subscriptions;
 create policy "subs_select_staff_or_self" on subscriptions for select
   using (is_staff() or exists (select 1 from profiles p where p.id = auth.uid() and p.member_id = subscriptions.member_id));
+drop policy if exists "subs_write_staff" on subscriptions;
 create policy "subs_write_staff" on subscriptions for all
   using (is_staff()) with check (is_staff());
 
 -- payments
+drop policy if exists "payments_select_staff_or_self" on payments;
 create policy "payments_select_staff_or_self" on payments for select
   using (is_staff() or exists (select 1 from profiles p where p.id = auth.uid() and p.member_id = payments.member_id));
+drop policy if exists "payments_write_staff" on payments;
 create policy "payments_write_staff" on payments for all
   using (is_staff()) with check (is_staff());
 
 -- attendance
+drop policy if exists "attendance_select_staff_or_self" on attendance_records;
 create policy "attendance_select_staff_or_self" on attendance_records for select
   using (is_staff() or exists (select 1 from profiles p where p.id = auth.uid() and p.member_id = attendance_records.member_id));
+drop policy if exists "attendance_write_staff" on attendance_records;
 create policy "attendance_write_staff" on attendance_records for all
   using (is_staff()) with check (is_staff());
 
 -- trainers
+drop policy if exists "trainers_select_authed" on trainers;
 create policy "trainers_select_authed" on trainers for select using (auth.uid() is not null);
+drop policy if exists "trainers_write_admin" on trainers;
 create policy "trainers_write_admin" on trainers for all using (is_admin()) with check (is_admin());
 
 -- assignments
+drop policy if exists "assignments_select_authed" on trainer_member_assignments;
 create policy "assignments_select_authed" on trainer_member_assignments for select using (auth.uid() is not null);
+drop policy if exists "assignments_write_admin" on trainer_member_assignments;
 create policy "assignments_write_admin" on trainer_member_assignments for all using (is_admin()) with check (is_admin());
 
 -- workout plans
+drop policy if exists "workout_plans_select_staff_or_self" on workout_plans;
 create policy "workout_plans_select_staff_or_self" on workout_plans for select
   using (is_staff() or exists (select 1 from profiles p where p.id = auth.uid() and p.member_id = workout_plans.member_id));
+drop policy if exists "workout_plans_write_staff" on workout_plans;
 create policy "workout_plans_write_staff" on workout_plans for all using (is_staff()) with check (is_staff());
 
+drop policy if exists "workout_exercises_select_authed" on workout_exercises;
 create policy "workout_exercises_select_authed" on workout_exercises for select using (auth.uid() is not null);
+drop policy if exists "workout_exercises_write_staff" on workout_exercises;
 create policy "workout_exercises_write_staff" on workout_exercises for all using (is_staff()) with check (is_staff());
 
+drop policy if exists "workout_sessions_select_staff_or_self" on workout_sessions;
 create policy "workout_sessions_select_staff_or_self" on workout_sessions for select
   using (is_staff() or exists (select 1 from profiles p where p.id = auth.uid() and p.member_id = workout_sessions.member_id));
+drop policy if exists "workout_sessions_write_staff_or_self" on workout_sessions;
 create policy "workout_sessions_write_staff_or_self" on workout_sessions for all using (auth.uid() is not null) with check (auth.uid() is not null);
 
 -- progress
+drop policy if exists "progress_select_staff_or_self" on fitness_progress_entries;
 create policy "progress_select_staff_or_self" on fitness_progress_entries for select
   using (is_staff() or exists (select 1 from profiles p where p.id = auth.uid() and p.member_id = fitness_progress_entries.member_id));
+drop policy if exists "progress_write_staff_or_self" on fitness_progress_entries;
 create policy "progress_write_staff_or_self" on fitness_progress_entries for all using (auth.uid() is not null) with check (auth.uid() is not null);
 
 -- classes
+drop policy if exists "classes_select_authed" on classes;
 create policy "classes_select_authed" on classes for select using (auth.uid() is not null);
+drop policy if exists "classes_write_admin" on classes;
 create policy "classes_write_admin" on classes for all using (is_admin()) with check (is_admin());
 
+drop policy if exists "enrollments_select_authed" on class_enrollments;
 create policy "enrollments_select_authed" on class_enrollments for select using (auth.uid() is not null);
+drop policy if exists "enrollments_write_staff" on class_enrollments;
 create policy "enrollments_write_staff" on class_enrollments for all using (is_staff()) with check (is_staff());
 
 -- equipment
+drop policy if exists "equipment_select_authed" on equipment;
 create policy "equipment_select_authed" on equipment for select using (auth.uid() is not null);
+drop policy if exists "equipment_write_admin" on equipment;
 create policy "equipment_write_admin" on equipment for all using (is_admin()) with check (is_admin());
 
+drop policy if exists "maint_select_authed" on equipment_maintenance_records;
 create policy "maint_select_authed" on equipment_maintenance_records for select using (auth.uid() is not null);
+drop policy if exists "maint_write_admin" on equipment_maintenance_records;
 create policy "maint_write_admin" on equipment_maintenance_records for all using (is_admin()) with check (is_admin());
 
 -- notifications
+drop policy if exists "notifications_own" on notifications;
 create policy "notifications_own" on notifications for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- audit logs (read admin only; insert via service/admin)
+drop policy if exists "audit_select_admin" on audit_logs;
 create policy "audit_select_admin" on audit_logs for select using (is_admin());
+drop policy if exists "audit_insert_admin" on audit_logs;
 create policy "audit_insert_admin" on audit_logs for insert with check (is_admin());
 
 -- handle_new_user trigger
@@ -412,11 +471,19 @@ create or replace function touch_updated_at() returns trigger
 language plpgsql as $$
 begin new.updated_at = now(); return new; end; $$;
 
+drop trigger if exists trg_profiles_upd on profiles;
 create trigger trg_profiles_upd before update on profiles for each row execute function touch_updated_at();
+drop trigger if exists trg_members_upd on members;
 create trigger trg_members_upd before update on members for each row execute function touch_updated_at();
+drop trigger if exists trg_plans_upd on membership_plans;
 create trigger trg_plans_upd before update on membership_plans for each row execute function touch_updated_at();
+drop trigger if exists trg_subs_upd on subscriptions;
 create trigger trg_subs_upd before update on subscriptions for each row execute function touch_updated_at();
+drop trigger if exists trg_trainers_upd on trainers;
 create trigger trg_trainers_upd before update on trainers for each row execute function touch_updated_at();
+drop trigger if exists trg_plansw_upd on workout_plans;
 create trigger trg_plansw_upd before update on workout_plans for each row execute function touch_updated_at();
+drop trigger if exists trg_classes_upd on classes;
 create trigger trg_classes_upd before update on classes for each row execute function touch_updated_at();
+drop trigger if exists trg_equip_upd on equipment;
 create trigger trg_equip_upd before update on equipment for each row execute function touch_updated_at();
