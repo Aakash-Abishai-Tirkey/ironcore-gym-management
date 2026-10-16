@@ -175,7 +175,7 @@ select
   m.id, null,
   (500 + (g * 250))::numeric(12,2),
   (current_date - (g % 12)) + interval '18 hours',
-  (array['cash','upi','card','bank_transfer'])[1 + (g % 4)],
+  (array['cash','upi','card','bank_transfer']::payment_method[])[1 + (g % 4)],
   'completed',
   '00000000-0000-4000-8000-000000000003'
 from generate_series(1, 12) g
@@ -319,17 +319,17 @@ where not exists (
 
 insert into fitness_progress_entries (member_id, recorded_by, recorded_at, weight, body_fat, measurements, notes)
 select v.* from (values
-  ('10000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000004', current_date - 60, 88.50, 26.0, '{"chest_cm":102,"waist_cm":92,"arm_cm":36}','Baseline measurement'),
-  ('10000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000004', current_date - 30, 84.20, 23.4, '{"chest_cm":103,"waist_cm":87,"arm_cm":37}','Mid-program check'),
-  ('10000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000004', current_date - 7,  81.90, 21.8, '{"chest_cm":104,"waist_cm":83,"arm_cm":38}','Good progress, squat +10kg'),
-  ('10000000-0000-4000-8000-000000000005','00000000-0000-4000-8000-000000000004', current_date - 30, 68.40, 18.0, '{"chest_cm":98,"waist_cm":78,"arm_cm":34}',null),
-  ('10000000-0000-4000-8000-000000000005','00000000-0000-4000-8000-000000000004', current_date - 7,  69.60, 17.6, '{"chest_cm":99,"waist_cm":79,"arm_cm":35}','Gaining as planned'),
-  ('10000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000004', current_date - 21, 57.20, 24.0, '{"waist_cm":70,"arm_cm":28}',null),
-  ('10000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000004', current_date - 7,  55.80, 22.5, '{"waist_cm":68,"arm_cm":28.5}','Progressing well'),
-  ('10000000-0000-4000-8000-000000000006','00000000-0000-4000-8000-000000000004', current_date - 14, 63.00, 27.0, '{"waist_cm":74,"arm_cm":29}',null),
+  ('10000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000004', current_date - 60, 88.50, 26.0, '{"chest_cm":102,"waist_cm":92,"arm_cm":36}'::jsonb,'Baseline measurement'),
+  ('10000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000004', current_date - 30, 84.20, 23.4, '{"chest_cm":103,"waist_cm":87,"arm_cm":37}'::jsonb,'Mid-program check'),
+  ('10000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000004', current_date - 7,  81.90, 21.8, '{"chest_cm":104,"waist_cm":83,"arm_cm":38}'::jsonb,'Good progress, squat +10kg'),
+  ('10000000-0000-4000-8000-000000000005','00000000-0000-4000-8000-000000000004', current_date - 30, 68.40, 18.0, '{"chest_cm":98,"waist_cm":78,"arm_cm":34}'::jsonb,null),
+  ('10000000-0000-4000-8000-000000000005','00000000-0000-4000-8000-000000000004', current_date - 7,  69.60, 17.6, '{"chest_cm":99,"waist_cm":79,"arm_cm":35}'::jsonb,'Gaining as planned'),
+  ('10000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000004', current_date - 21, 57.20, 24.0, '{"waist_cm":70,"arm_cm":28}'::jsonb,null),
+  ('10000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000004', current_date - 7,  55.80, 22.5, '{"waist_cm":68,"arm_cm":28.5}'::jsonb,'Progressing well'),
+  ('10000000-0000-4000-8000-000000000006','00000000-0000-4000-8000-000000000004', current_date - 14, 63.00, 27.0, '{"waist_cm":74,"arm_cm":29}'::jsonb,null),
   ('10000000-0000-4000-8000-000000000007','00000000-0000-4000-8000-000000000004', current_date - 7,  82.30, 15.2, '{"chest_cm":106,"waist_cm":85}',null),
-  ('10000000-0000-4000-8000-000000000013','00000000-0000-4000-8000-000000000004', current_date - 6,  74.10, 14.0, '{"waist_cm":80,"arm_cm":35}',null),
-  ('10000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000004', current_date - 5,  54.60, 25.5, '{"waist_cm":66,"arm_cm":26}',null)
+  ('10000000-0000-4000-8000-000000000013','00000000-0000-4000-8000-000000000004', current_date - 6,  74.10, 14.0, '{"waist_cm":80,"arm_cm":35}'::jsonb,null),
+  ('10000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000004', current_date - 5,  54.60, 25.5, '{"waist_cm":66,"arm_cm":26}'::jsonb,null)
 ) as v(member_id, recorded_by, recorded_at, weight, body_fat, measurements, notes)
 where not exists (
   select 1 from fitness_progress_entries f
