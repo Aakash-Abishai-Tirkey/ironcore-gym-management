@@ -189,10 +189,10 @@ insert into attendance_records (id, member_id, check_in_at, check_out_at, record
 select
   extensions.gen_random_uuid(),
   m.id,
-  (current_date - d)::timestamptz + ((17 + (n % 4)) || ' hours')::interval,
-  case when (n % 5) = 0 then null
-       else (current_date - d)::timestamptz + ((19 + (n % 3)) || ' hours')::interval end,
-  case when (n % 3) = 0
+  s.check_in_at,
+  case when (m.n % 5) = 0 then null
+       else s.check_in_at + interval '1 hour 15 minutes' end,
+  case when (m.n % 3) = 0
        then '00000000-0000-4000-8000-000000000003'::uuid
        else '00000000-0000-4000-8000-000000000004'::uuid
   end
@@ -200,6 +200,9 @@ from generate_series(0, 20) d
 cross join lateral (
   select row_number() over (order by id) as n, id from members
 ) m
+cross join lateral (
+  select (current_date - d)::timestamptz + ((17 + (m.n % 4)) || ' hours')::interval as check_in_at
+) s
 where (m.n % 3) = (d % 3);
 
 -- Todays check-ins (one deliberately left open to test duplicate-check-in protection)
