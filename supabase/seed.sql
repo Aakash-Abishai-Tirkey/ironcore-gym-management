@@ -192,7 +192,10 @@ select
   (current_date - d)::timestamptz + ((17 + (n % 4)) || ' hours')::interval,
   case when (n % 5) = 0 then null
        else (current_date - d)::timestamptz + ((19 + (n % 3)) || ' hours')::interval end,
-  case when (n % 3) = 0 then '00000000-0000-4000-8000-000000000003' else '00000000-0000-4000-8000-000000000004' end
+  case when (n % 3) = 0
+       then '00000000-0000-4000-8000-000000000003'::uuid
+       else '00000000-0000-4000-8000-000000000004'::uuid
+  end
 from generate_series(0, 20) d
 cross join lateral (
   select row_number() over (order by id) as n, id from members
