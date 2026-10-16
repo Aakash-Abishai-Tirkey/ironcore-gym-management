@@ -414,7 +414,7 @@ where not exists (
 -- 12. Notifications (for owner + front desk)
 -- -----------------------------------------------------------------------------
 insert into notifications (user_id, type, title, message, read_at)
-select '00000000-0000-4000-8000-000000000001','membership_expiring','Membership expiring in 3 days','Aarav Sharma (M-000001) Monthly plan expires soon.','00000000-0000-0000-0000-000000000000'::uuid
+select '00000000-0000-4000-8000-000000000001','membership_expiring','Membership expiring in 3 days','Aarav Sharma (M-000001) Monthly plan expires soon.', now() - interval '2 hours'
 where not exists (select 1 from notifications where user_id='00000000-0000-4000-8000-000000000001' and title like 'Membership expiring in 3 days%');
 
 insert into notifications (user_id, type, title, message)
